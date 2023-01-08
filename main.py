@@ -2,7 +2,7 @@ import tweepy
 import sys
 import requests
 import pandas as pd
-from concurrent.futures import ThreadPoolExecutor
+import threading
 from config import api_key, api_key_secret, access_token, access_token_secret, bearer_token, hf_token
 
 
@@ -43,23 +43,36 @@ headers = {"Authorization": f"Bearer {hf_token}"}
 
 #sentiment analysis
 tweets_analysis = []
+threads = []
 
 def analysis(data):
 	#feed through api
 	payload = dict(inputs=data, options=dict(wait_for_model=True))
 	response = requests.post(hf_url, headers=headers, json=payload)
 
+	sentiment_result = response.json()
+
 	#process response
-	sentiment_result = response.json()[0]
-	top_sentiment = max(sentiment_result, key=lambda x: x['score']) # Get the sentiment with the higher score
-	tweets_analysis.append({'tweet': tweet, 'sentiment': top_sentiment['label']})
+	try:
+		sentiment_result = sentiment_result[0]
+		top_sentiment = max(sentiment_result, key=lambda x: x['score']) # Get the sentiment with the higher score
+		tweets_analysis.append({'tweet': tweet, 'sentiment': top_sentiment['label']})
+
+	except Exception as e:
+		print(e)
+		print(sentiment_result)
 
 
+for tweet in tweets:
+	t = threading.Thread(target=analysis, args=(tweet,), daemon=True)
+	threads.append(t)
 
-with ThreadPoolExecutor() as executor:
-	executor.map(analysis, tweets):
+for thread in threads:
+	thread.start()
 
-
+for thread in threads:
+	thread.join()
+	
 
 # Load the data in a dataframe
 pd.set_option('max_colwidth', None)
